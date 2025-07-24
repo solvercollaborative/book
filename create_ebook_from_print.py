@@ -73,36 +73,6 @@ def adjust_copyright_page(doc: Document) -> None:
                 p.getparent().remove(p)
             break
 
-def remove_page_numbers_from_toc_tof(doc: Document) -> None:
-    """Toggle off page numbers in TOC and TOF by removing trailing numbers after tabs in those sections."""
-    toc_headings = ["Table of Contents", "Contents"]
-    tof_headings = ["Table of Figures", "List of Figures"]
-    in_toc = False
-    in_tof = False
-    for paragraph in doc.paragraphs:
-        text = paragraph.text.strip()
-        # Detect start of TOC or TOF
-        if any(h in text for h in toc_headings):
-            in_toc = True
-            in_tof = False
-            continue
-        if any(h in text for h in tof_headings):
-            in_tof = True
-            in_toc = False
-            continue
-        # Detect end of TOC/TOF (next heading or empty line after section)
-        if in_toc or in_tof:
-            if text == "" or text.isupper():
-                in_toc = False
-                in_tof = False
-                continue
-            # Remove page number after tab (usually last tab-separated value)
-            if "\t" in paragraph.text:
-                parts = paragraph.text.rsplit("\t", 1)
-                if len(parts) == 2 and parts[1].strip().isdigit():
-                    # Remove the page number
-                    paragraph.text = parts[0]
-
 def convert_index_to_static_text(doc: Document) -> None:
     """Convert the index field to static text by clearing and replacing index paragraphs with their plain text content."""
 
@@ -389,17 +359,26 @@ def link_index_entries_to_bookmarks(doc: Document, index_term_to_bookmark: dict,
             if ',' in original_text:
                 parts = original_text.rsplit(',', 1)  # Split on last comma
                 term_part = parts[0].strip()
-                page_part = parts[1].strip() if len(parts) > 1 else ""
+                # page_part = parts[1].strip() if len(parts) > 1 else ""
                 
-                # Create hyperlink for the term part
+                # Create hyperlink for the term part only (no page number)
                 add_hyperlink_to_paragraph(para, term_part, bookmark_name)
                 
-                # Add the page number part as regular text
-                if page_part:
-                    para.add_run(f", {page_part}")
+                # Don't add the page number part back - remove this section:
+                # if page_part:
+                #     para.add_run(f", {page_part}")
             else:
                 # No page number, just make the whole thing a hyperlink
                 add_hyperlink_to_paragraph(para, original_text, bookmark_name)
+        else:
+            # For unlinked entries, also remove page numbers
+            original_text = para.text
+            if ',' in original_text:
+                parts = original_text.rsplit(',', 1)  # Split on last comma
+                term_part = parts[0].strip()
+                # Replace the paragraph text with just the term (no page number)
+                para.clear()
+                para.add_run(term_part)
     
     print(f"Created hyperlinks for {matched_count} index entries")
 
@@ -514,47 +493,84 @@ def validate_index(doc: Document) -> None:
 
 
 def load_docx(filename: str) -> Document:
+    """Load the DOCX file and validate it contains '8x10' and is a .docx file."""
+    if not filename.lower().endswith('.docx'):
+        raise ValueError("File must be a .docx file")
+    
     if "8x10" not in filename:
         raise ValueError("Filename must contain '8x10'")
-    if not filename.endswith('.docx'):
-        raise ValueError("Input file must be a .docx file")
+    
     doc = Document(filename)
     return doc
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python book_loader.py <path_to_docx_file>")
-        return
+    """Main function to process the document."""
+    import sys
+    import os
+    import tempfile
+    from docx.shared import Pt
+    
+    if len(sys.argv) != 2:
+        print("Usage: python create_ebook_from_print.py <input_filename>")
+        sys.exit(1)
+    
     filename = sys.argv[1]
+    
     try:
+        # Step 1: Load and validate the document
         doc = load_docx(filename)
-        new_filename = filename.replace("8x10", "e-book")
+        
+        # Step 2: Set font to Georgia
         set_font_georgia(doc)
+        
+        # Step 3: Adjust title page
         adjust_title_page(doc)
+        
+        # Step 4: Adjust copyright page  
         adjust_copyright_page(doc)
-        #remove_page_numbers_from_toc_tof(doc)
+        
+        # Step 5: Convert index to static text
         convert_index_to_static_text(doc)
+        
+        # Step 6: Check index entries for single page numbers
         check_index_entries_single_page_number(doc)
-        # Save intermediate e-book before bookmark step
-        import tempfile, os, shutil
-        temp_fd, temp_path = tempfile.mkstemp(suffix='.docx')
-        os.close(temp_fd)
-        doc.save(temp_path)
-        # Use a temporary file for the bookmark step
-        index_term_to_bookmark, bookmark_to_text = convert_xe_tags_to_bookmarks(temp_path, new_filename)
-        os.remove(temp_path)
         
-        # Now link index entries to bookmarks
-        doc = Document(new_filename)  # Reload the document with bookmarks
-        link_index_entries_to_bookmarks(doc, index_term_to_bookmark, bookmark_to_text)
-        doc.save(new_filename)  # Save with hyperlinks
+        # Step 7: Create new filename for e-book version
+        base_name = os.path.splitext(filename)[0]
+        new_filename = base_name.replace("8x10", "e-book") + ".docx"
         
-        print(f"Cloned document saved as: {new_filename}")
-        print(f"Created {len(index_term_to_bookmark)} exact index term mappings")
-        print(f"Created {len(bookmark_to_text)} bookmark text mappings for fuzzy matching")
+        # Save the document before XE tag conversion
+        doc.save(new_filename)
+        
+        # Step 8: Convert XE tags to bookmarks (requires file manipulation)
+        with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as temp_file:
+            temp_filename = temp_file.name
+        
+        try:
+            index_term_to_bookmark, bookmark_to_text = convert_xe_tags_to_bookmarks(new_filename, temp_filename)
+            
+            # Load the modified document and create hyperlinks
+            doc_with_bookmarks = Document(temp_filename)
+            link_index_entries_to_bookmarks(doc_with_bookmarks, index_term_to_bookmark, bookmark_to_text)
+            
+            # Save final version
+            doc_with_bookmarks.save(new_filename)
+            
+            print(f"Cloned document saved as: {new_filename}")
+            print(f"Created {len(index_term_to_bookmark)} exact index term mappings")
+            print(f"Created {len(bookmark_to_text)} bookmark text mappings for fuzzy matching")
+            
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_filename)
+            except:
+                pass
+        
     except Exception as e:
         print(f"Error: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
