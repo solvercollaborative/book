@@ -1,2 +1,2 @@
 source venv/bin/activate
-python book_loader.py "../mybooks/superarchitelligence Vol1 8x10.docx"
+python create_ebook_from_print.py "../mybooks/superarchitelligence Vol1 8x10.docx"
