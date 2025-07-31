@@ -1,0 +1,18 @@
+Create a python program named convert_XE_tags.py that reads and input file and converts each instance of XE tag to a point bookmark.
+
+The input print book file we will be working with is "../mybooks/superArchItelligence Vol1 8x10.docm". 
+I will call it input_file for short.
+
+The output e-book file we will be creating is "../mybooks/superArchItelligence Vol1 e-book.docm". 
+I will call it output_file for short.
+
+The input-file has 402 instances of XE tag.
+We have tested code that counts XE tags, so we don't need to count them.
+
+We also have tested code that counts point bookmarks. 
+There is 1 point bookmark in the input_file.
+
+Count the point bookmarks after the conversion.
+Create a unit test case that verifies the resulting count is equal to 403.
+
+Output the results of the program and the test case.

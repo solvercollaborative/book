@@ -1,0 +1,28 @@
+Create a python program named link_citations.py that reads an input word docx file.
+For each citation in the input file 
+1. look up the citation source in the references section, 
+2. retrieve the URL for the citation
+3. adds a hyperlink around the citation reference so that it links to the URL.
+The result should be that the citation looks the same, but is clickable. 
+This is a convenience to the reader in PDF format.
+
+INPUT FILE SPEC
+The input print book filename will be read from the command line.
+Expect an input filename like "../mybooks/superArchItelligence Vol2 8x10.docx". 
+
+OUTPUT FILE NAME
+The output filename will be the same name except "8x10" is replaced with "linked".
+expect an output filename like "../mybooks/superArchItelligence Vol2 linked.docx". 
+
+TESTING
+Create a separate funtion to run a test. The test will read the input file
+named "test_link_input.docx" and write the output file "test_link_output.docx".
+Compare test_link_output.docx to example_link_output.docx to see if it is correct.
+
+When I run the program with no input file specified on the command line then
+run the test function.
+
+
+RUNNING
+If I specify an input file on the command line then process the specified file 
+and create the output file with the new name as directed above.
